@@ -1,0 +1,12 @@
+log_file,parallelism,compile,status,gen_time_s,s_per_step,wall_time_s,peak_alloc_gib_rank0,peak_alloc_gib_rank1,peak_reserved_gib_rank0,peak_reserved_gib_rank1,resident_weights_gib,output_file
+benchmark_parallel.log,seq-ring,eager,success,45.13,0.90,72.06,22.57,22.57,26.22,26.22,13.73,par_ring_vanilla_eager.mp4
+benchmark_parallel.log,seq-ring,jit-default,success,32.94,0.66,87.975,22.57,22.57,26.16,26.16,13.78,par_ring_vanilla_jit-default.mp4
+benchmark_parallel1.log,none,eager,success,73.68,1.47,96.497,22.57,,26.84,,13.73,par_none_vanilla_eager.mp4
+benchmark_parallel1.log,none,jit-default,success,55.92,1.12,88.432,22.57,,26.33,,13.78,par_none_vanilla_jit-default.mp4
+benchmark_parallel1.log,none,jit-reduce-overhead,success,56.09,1.12,89.156,22.57,,27.21,,13.78,par_none_vanilla_jit-reduce-overhead.mp4
+benchmark_parallel1.log,none,jit-max-autotune,success,58.59,1.17,97.221,22.57,,27.16,,13.78,par_none_vanilla_jit-max-autotune.mp4
+benchmark_parallel1.log,cfg-parallel,eager,success,48.79,0.98,71.764,22.61,,27.13,,13.73,par_cfg_vanilla_eager.mp4
+benchmark_parallel1.log,cfg-parallel,jit-default,success,46.38,0.93,83.53999999999999,22.61,,26.33,,13.82,par_cfg_vanilla_jit-default.mp4
+benchmark_parallel1.log,seq-ulysses,eager,success,44.3,0.89,71.233,22.57,22.57,26.19,26.19,13.73,par_ulysses_vanilla_eager.mp4
+benchmark_parallel1.log,seq-ulysses,jit-default,success,32.52,0.65,78.697,22.57,22.57,26.17,26.17,13.78,par_ulysses_vanilla_jit-default.mp4
+benchmark_parallel1.log,seq-ulysses,jit-reduce-overhead,success,32.56,0.65,,22.57,22.57,26.73,26.73,13.78,par_ulysses_vanilla_jit-reduce-overhead.mp4

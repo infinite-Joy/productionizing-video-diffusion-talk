@@ -1,0 +1,266 @@
+# Wan2.1 Benchmark Commands
+# Fixed: --dtype bfloat16 · --monitor-memory · --num-frames 81 · --fps 16
+#
+# ── Part 1: Vanilla pipeline + torch.compile  (wan2_text_to_video.py) ──────
+# Axes: scheduler (default / unipc / dpm)
+#       quant/attn (base / fp8 / sage / fp8+sage)
+#       compile    (jit-default / jit-reduce-overhead / jit-max-autotune /
+#                   aot-default / aot-reduce-overhead / aot-max-autotune)
+#
+# 3 × 4 × 6 = 72 commands total
+
+PROMPT="A cat walking through a sunlit garden, cinematic lighting"
+
+# ===========================================================================
+# Scheduler: default
+# ===========================================================================
+
+# --- quant: base ---
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --compile --compile-mode default          --output cat_vanilla_default_base_jit_default.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --compile --compile-mode reduce-overhead  --output cat_vanilla_default_base_jit_reduce_overhead.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --compile --compile-mode max-autotune    --output cat_vanilla_default_base_jit_max_autotune.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --aot-compile --compile-mode default         --aot-cache aot_vanilla_default_base_default.pt --output cat_vanilla_default_base_aot_default.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --aot-compile --compile-mode reduce-overhead --aot-cache aot_vanilla_default_base_ro.pt      --output cat_vanilla_default_base_aot_reduce_overhead.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --aot-compile --compile-mode max-autotune    --aot-cache aot_vanilla_default_base_ma.pt      --output cat_vanilla_default_base_aot_max_autotune.mp4
+
+# --- quant: fp8 ---
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --fp8 --compile --compile-mode default          --output cat_vanilla_default_fp8_jit_default.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --fp8 --compile --compile-mode reduce-overhead  --output cat_vanilla_default_fp8_jit_reduce_overhead.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --fp8 --compile --compile-mode max-autotune    --output cat_vanilla_default_fp8_jit_max_autotune.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --fp8 --aot-compile --compile-mode default         --aot-cache aot_vanilla_default_fp8_default.pt --output cat_vanilla_default_fp8_aot_default.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --fp8 --aot-compile --compile-mode reduce-overhead --aot-cache aot_vanilla_default_fp8_ro.pt      --output cat_vanilla_default_fp8_aot_reduce_overhead.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --fp8 --aot-compile --compile-mode max-autotune    --aot-cache aot_vanilla_default_fp8_ma.pt      --output cat_vanilla_default_fp8_aot_max_autotune.mp4
+
+# --- quant: sage ---
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --sage-attention --compile --compile-mode default          --output cat_vanilla_default_sage_jit_default.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --sage-attention --compile --compile-mode reduce-overhead  --output cat_vanilla_default_sage_jit_reduce_overhead.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --sage-attention --compile --compile-mode max-autotune    --output cat_vanilla_default_sage_jit_max_autotune.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --sage-attention --aot-compile --compile-mode default         --aot-cache aot_vanilla_default_sage_default.pt --output cat_vanilla_default_sage_aot_default.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --sage-attention --aot-compile --compile-mode reduce-overhead --aot-cache aot_vanilla_default_sage_ro.pt      --output cat_vanilla_default_sage_aot_reduce_overhead.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --sage-attention --aot-compile --compile-mode max-autotune    --aot-cache aot_vanilla_default_sage_ma.pt      --output cat_vanilla_default_sage_aot_max_autotune.mp4
+
+# --- quant: fp8+sage ---
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --fp8 --sage-attention --compile --compile-mode default          --output cat_vanilla_default_fp8sage_jit_default.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --fp8 --sage-attention --compile --compile-mode reduce-overhead  --output cat_vanilla_default_fp8sage_jit_reduce_overhead.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --fp8 --sage-attention --compile --compile-mode max-autotune    --output cat_vanilla_default_fp8sage_jit_max_autotune.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --fp8 --sage-attention --aot-compile --compile-mode default         --aot-cache aot_vanilla_default_fp8sage_default.pt --output cat_vanilla_default_fp8sage_aot_default.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --fp8 --sage-attention --aot-compile --compile-mode reduce-overhead --aot-cache aot_vanilla_default_fp8sage_ro.pt      --output cat_vanilla_default_fp8sage_aot_reduce_overhead.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --fp8 --sage-attention --aot-compile --compile-mode max-autotune    --aot-cache aot_vanilla_default_fp8sage_ma.pt      --output cat_vanilla_default_fp8sage_aot_max_autotune.mp4
+
+# ===========================================================================
+# Scheduler: unipc
+# ===========================================================================
+
+# --- quant: base ---
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler unipc --compile --compile-mode default          --output cat_vanilla_unipc_base_jit_default.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler unipc --compile --compile-mode reduce-overhead  --output cat_vanilla_unipc_base_jit_reduce_overhead.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler unipc --compile --compile-mode max-autotune    --output cat_vanilla_unipc_base_jit_max_autotune.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler unipc --aot-compile --compile-mode default         --aot-cache aot_vanilla_unipc_base_default.pt --output cat_vanilla_unipc_base_aot_default.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler unipc --aot-compile --compile-mode reduce-overhead --aot-cache aot_vanilla_unipc_base_ro.pt      --output cat_vanilla_unipc_base_aot_reduce_overhead.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler unipc --aot-compile --compile-mode max-autotune    --aot-cache aot_vanilla_unipc_base_ma.pt      --output cat_vanilla_unipc_base_aot_max_autotune.mp4
+
+# --- quant: fp8 ---
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler unipc --fp8 --compile --compile-mode default          --output cat_vanilla_unipc_fp8_jit_default.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler unipc --fp8 --compile --compile-mode reduce-overhead  --output cat_vanilla_unipc_fp8_jit_reduce_overhead.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler unipc --fp8 --compile --compile-mode max-autotune    --output cat_vanilla_unipc_fp8_jit_max_autotune.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler unipc --fp8 --aot-compile --compile-mode default         --aot-cache aot_vanilla_unipc_fp8_default.pt --output cat_vanilla_unipc_fp8_aot_default.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler unipc --fp8 --aot-compile --compile-mode reduce-overhead --aot-cache aot_vanilla_unipc_fp8_ro.pt      --output cat_vanilla_unipc_fp8_aot_reduce_overhead.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler unipc --fp8 --aot-compile --compile-mode max-autotune    --aot-cache aot_vanilla_unipc_fp8_ma.pt      --output cat_vanilla_unipc_fp8_aot_max_autotune.mp4
+
+# --- quant: sage ---
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler unipc --sage-attention --compile --compile-mode default          --output cat_vanilla_unipc_sage_jit_default.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler unipc --sage-attention --compile --compile-mode reduce-overhead  --output cat_vanilla_unipc_sage_jit_reduce_overhead.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler unipc --sage-attention --compile --compile-mode max-autotune    --output cat_vanilla_unipc_sage_jit_max_autotune.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler unipc --sage-attention --aot-compile --compile-mode default         --aot-cache aot_vanilla_unipc_sage_default.pt --output cat_vanilla_unipc_sage_aot_default.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler unipc --sage-attention --aot-compile --compile-mode reduce-overhead --aot-cache aot_vanilla_unipc_sage_ro.pt      --output cat_vanilla_unipc_sage_aot_reduce_overhead.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler unipc --sage-attention --aot-compile --compile-mode max-autotune    --aot-cache aot_vanilla_unipc_sage_ma.pt      --output cat_vanilla_unipc_sage_aot_max_autotune.mp4
+
+# --- quant: fp8+sage ---
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler unipc --fp8 --sage-attention --compile --compile-mode default          --output cat_vanilla_unipc_fp8sage_jit_default.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler unipc --fp8 --sage-attention --compile --compile-mode reduce-overhead  --output cat_vanilla_unipc_fp8sage_jit_reduce_overhead.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler unipc --fp8 --sage-attention --compile --compile-mode max-autotune    --output cat_vanilla_unipc_fp8sage_jit_max_autotune.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler unipc --fp8 --sage-attention --aot-compile --compile-mode default         --aot-cache aot_vanilla_unipc_fp8sage_default.pt --output cat_vanilla_unipc_fp8sage_aot_default.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler unipc --fp8 --sage-attention --aot-compile --compile-mode reduce-overhead --aot-cache aot_vanilla_unipc_fp8sage_ro.pt      --output cat_vanilla_unipc_fp8sage_aot_reduce_overhead.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler unipc --fp8 --sage-attention --aot-compile --compile-mode max-autotune    --aot-cache aot_vanilla_unipc_fp8sage_ma.pt      --output cat_vanilla_unipc_fp8sage_aot_max_autotune.mp4
+
+# ===========================================================================
+# Scheduler: dpm
+# ===========================================================================
+
+# --- quant: base ---
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler dpm --compile --compile-mode default          --output cat_vanilla_dpm_base_jit_default.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler dpm --compile --compile-mode reduce-overhead  --output cat_vanilla_dpm_base_jit_reduce_overhead.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler dpm --compile --compile-mode max-autotune    --output cat_vanilla_dpm_base_jit_max_autotune.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler dpm --aot-compile --compile-mode default         --aot-cache aot_vanilla_dpm_base_default.pt --output cat_vanilla_dpm_base_aot_default.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler dpm --aot-compile --compile-mode reduce-overhead --aot-cache aot_vanilla_dpm_base_ro.pt      --output cat_vanilla_dpm_base_aot_reduce_overhead.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler dpm --aot-compile --compile-mode max-autotune    --aot-cache aot_vanilla_dpm_base_ma.pt      --output cat_vanilla_dpm_base_aot_max_autotune.mp4
+
+# --- quant: fp8 ---
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler dpm --fp8 --compile --compile-mode default          --output cat_vanilla_dpm_fp8_jit_default.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler dpm --fp8 --compile --compile-mode reduce-overhead  --output cat_vanilla_dpm_fp8_jit_reduce_overhead.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler dpm --fp8 --compile --compile-mode max-autotune    --output cat_vanilla_dpm_fp8_jit_max_autotune.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler dpm --fp8 --aot-compile --compile-mode default         --aot-cache aot_vanilla_dpm_fp8_default.pt --output cat_vanilla_dpm_fp8_aot_default.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler dpm --fp8 --aot-compile --compile-mode reduce-overhead --aot-cache aot_vanilla_dpm_fp8_ro.pt      --output cat_vanilla_dpm_fp8_aot_reduce_overhead.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler dpm --fp8 --aot-compile --compile-mode max-autotune    --aot-cache aot_vanilla_dpm_fp8_ma.pt      --output cat_vanilla_dpm_fp8_aot_max_autotune.mp4
+
+# --- quant: sage ---
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler dpm --sage-attention --compile --compile-mode default          --output cat_vanilla_dpm_sage_jit_default.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler dpm --sage-attention --compile --compile-mode reduce-overhead  --output cat_vanilla_dpm_sage_jit_reduce_overhead.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler dpm --sage-attention --compile --compile-mode max-autotune    --output cat_vanilla_dpm_sage_jit_max_autotune.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler dpm --sage-attention --aot-compile --compile-mode default         --aot-cache aot_vanilla_dpm_sage_default.pt --output cat_vanilla_dpm_sage_aot_default.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler dpm --sage-attention --aot-compile --compile-mode reduce-overhead --aot-cache aot_vanilla_dpm_sage_ro.pt      --output cat_vanilla_dpm_sage_aot_reduce_overhead.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler dpm --sage-attention --aot-compile --compile-mode max-autotune    --aot-cache aot_vanilla_dpm_sage_ma.pt      --output cat_vanilla_dpm_sage_aot_max_autotune.mp4
+
+# --- quant: fp8+sage ---
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler dpm --fp8 --sage-attention --compile --compile-mode default          --output cat_vanilla_dpm_fp8sage_jit_default.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler dpm --fp8 --sage-attention --compile --compile-mode reduce-overhead  --output cat_vanilla_dpm_fp8sage_jit_reduce_overhead.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler dpm --fp8 --sage-attention --compile --compile-mode max-autotune    --output cat_vanilla_dpm_fp8sage_jit_max_autotune.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler dpm --fp8 --sage-attention --aot-compile --compile-mode default         --aot-cache aot_vanilla_dpm_fp8sage_default.pt --output cat_vanilla_dpm_fp8sage_aot_default.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler dpm --fp8 --sage-attention --aot-compile --compile-mode reduce-overhead --aot-cache aot_vanilla_dpm_fp8sage_ro.pt      --output cat_vanilla_dpm_fp8sage_aot_reduce_overhead.mp4
+uv run python wan2_text_to_video.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --no-lora --steps 50 --guidance-scale 5.0 --scheduler dpm --fp8 --sage-attention --aot-compile --compile-mode max-autotune    --aot-cache aot_vanilla_dpm_fp8sage_ma.pt      --output cat_vanilla_dpm_fp8sage_aot_max_autotune.mp4
+
+# ===========================================================================
+# ── Part 2: Parallel pipeline  (wan2_text_to_video_parallel.py) ────────────
+# Fixed: --dtype bfloat16 · --monitor-memory · --num-frames 81 · --fps 16
+#        --steps 50 · --guidance-scale 5.0
+#
+# Parallelism modes:
+#   cfg-parallel    — 2 GPUs (cuda:0 + cuda:1), launched with python
+#   ring-2gpu       — 2 GPUs, ring-only  (torchrun --nproc-per-node 2 --ring-degree 2)
+#   ulysses-2gpu    — 2 GPUs, ulysses-only (torchrun --nproc-per-node 2 --ulysses-degree 2 --ring-degree 1)
+#   ring-4gpu       — 4 GPUs, ring-only  (torchrun --nproc-per-node 4 --ring-degree 4)
+#   unified-4gpu    — 4 GPUs, unified SP (torchrun --nproc-per-node 4 --ulysses-degree 2 --ring-degree 2)
+#
+# Compile axis (no aot-compile in parallel script):
+#   eager · teacache · jit-default · jit-reduce-overhead · jit-max-autotune
+#
+# Scheduler axis: default · unipc · dpm
+#
+# Total: 5 modes × 3 schedulers × 5 compile = 75 commands
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# CFG Parallel — 2 GPUs (cuda:0 cond, cuda:1 uncond), standard python launch
+# Requires guidance_scale > 1.0 (5.0 here); seq-parallel incompatible.
+# ---------------------------------------------------------------------------
+
+# --- scheduler: default ---
+uv run python wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --cfg-parallel                                                             --output cat_par_cfg_default_eager.mp4
+uv run python wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --cfg-parallel --teacache                                                  --output cat_par_cfg_default_teacache.mp4
+uv run python wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --cfg-parallel --compile --compile-mode default                            --output cat_par_cfg_default_jit_default.mp4
+uv run python wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --cfg-parallel --compile --compile-mode reduce-overhead                    --output cat_par_cfg_default_jit_reduce_overhead.mp4
+uv run python wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --cfg-parallel --compile --compile-mode max-autotune                      --output cat_par_cfg_default_jit_max_autotune.mp4
+
+# --- scheduler: unipc ---
+uv run python wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --cfg-parallel --scheduler unipc                                           --output cat_par_cfg_unipc_eager.mp4
+uv run python wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --cfg-parallel --scheduler unipc --teacache                                --output cat_par_cfg_unipc_teacache.mp4
+uv run python wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --cfg-parallel --scheduler unipc --compile --compile-mode default           --output cat_par_cfg_unipc_jit_default.mp4
+uv run python wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --cfg-parallel --scheduler unipc --compile --compile-mode reduce-overhead   --output cat_par_cfg_unipc_jit_reduce_overhead.mp4
+uv run python wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --cfg-parallel --scheduler unipc --compile --compile-mode max-autotune     --output cat_par_cfg_unipc_jit_max_autotune.mp4
+
+# --- scheduler: dpm ---
+uv run python wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --cfg-parallel --scheduler dpm                                             --output cat_par_cfg_dpm_eager.mp4
+uv run python wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --cfg-parallel --scheduler dpm --teacache                                  --output cat_par_cfg_dpm_teacache.mp4
+uv run python wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --cfg-parallel --scheduler dpm --compile --compile-mode default             --output cat_par_cfg_dpm_jit_default.mp4
+uv run python wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --cfg-parallel --scheduler dpm --compile --compile-mode reduce-overhead     --output cat_par_cfg_dpm_jit_reduce_overhead.mp4
+uv run python wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --cfg-parallel --scheduler dpm --compile --compile-mode max-autotune       --output cat_par_cfg_dpm_jit_max_autotune.mp4
+
+# ---------------------------------------------------------------------------
+# Ring-only, 2 GPUs  (torchrun --nproc-per-node 2, --ring-degree 2)
+# ---------------------------------------------------------------------------
+
+# --- scheduler: default ---
+torchrun --nproc-per-node 2 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ring-degree 2                                          --output cat_par_ring2_default_eager.mp4
+torchrun --nproc-per-node 2 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ring-degree 2 --teacache                               --output cat_par_ring2_default_teacache.mp4
+torchrun --nproc-per-node 2 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ring-degree 2 --compile --compile-mode default          --output cat_par_ring2_default_jit_default.mp4
+torchrun --nproc-per-node 2 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ring-degree 2 --compile --compile-mode reduce-overhead  --output cat_par_ring2_default_jit_reduce_overhead.mp4
+torchrun --nproc-per-node 2 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ring-degree 2 --compile --compile-mode max-autotune    --output cat_par_ring2_default_jit_max_autotune.mp4
+
+# --- scheduler: unipc ---
+torchrun --nproc-per-node 2 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ring-degree 2 --scheduler unipc                        --output cat_par_ring2_unipc_eager.mp4
+torchrun --nproc-per-node 2 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ring-degree 2 --scheduler unipc --teacache             --output cat_par_ring2_unipc_teacache.mp4
+torchrun --nproc-per-node 2 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ring-degree 2 --scheduler unipc --compile --compile-mode default         --output cat_par_ring2_unipc_jit_default.mp4
+torchrun --nproc-per-node 2 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ring-degree 2 --scheduler unipc --compile --compile-mode reduce-overhead --output cat_par_ring2_unipc_jit_reduce_overhead.mp4
+torchrun --nproc-per-node 2 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ring-degree 2 --scheduler unipc --compile --compile-mode max-autotune    --output cat_par_ring2_unipc_jit_max_autotune.mp4
+
+# --- scheduler: dpm ---
+torchrun --nproc-per-node 2 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ring-degree 2 --scheduler dpm                          --output cat_par_ring2_dpm_eager.mp4
+torchrun --nproc-per-node 2 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ring-degree 2 --scheduler dpm --teacache               --output cat_par_ring2_dpm_teacache.mp4
+torchrun --nproc-per-node 2 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ring-degree 2 --scheduler dpm --compile --compile-mode default           --output cat_par_ring2_dpm_jit_default.mp4
+torchrun --nproc-per-node 2 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ring-degree 2 --scheduler dpm --compile --compile-mode reduce-overhead   --output cat_par_ring2_dpm_jit_reduce_overhead.mp4
+torchrun --nproc-per-node 2 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ring-degree 2 --scheduler dpm --compile --compile-mode max-autotune     --output cat_par_ring2_dpm_jit_max_autotune.mp4
+
+# ---------------------------------------------------------------------------
+# Ulysses-only, 2 GPUs  (torchrun --nproc-per-node 2, --ulysses-degree 2 --ring-degree 1)
+# ---------------------------------------------------------------------------
+
+# --- scheduler: default ---
+torchrun --nproc-per-node 2 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ulysses-degree 2 --ring-degree 1                                          --output cat_par_ulysses2_default_eager.mp4
+torchrun --nproc-per-node 2 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ulysses-degree 2 --ring-degree 1 --teacache                               --output cat_par_ulysses2_default_teacache.mp4
+torchrun --nproc-per-node 2 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ulysses-degree 2 --ring-degree 1 --compile --compile-mode default          --output cat_par_ulysses2_default_jit_default.mp4
+torchrun --nproc-per-node 2 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ulysses-degree 2 --ring-degree 1 --compile --compile-mode reduce-overhead  --output cat_par_ulysses2_default_jit_reduce_overhead.mp4
+torchrun --nproc-per-node 2 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ulysses-degree 2 --ring-degree 1 --compile --compile-mode max-autotune    --output cat_par_ulysses2_default_jit_max_autotune.mp4
+
+# --- scheduler: unipc ---
+torchrun --nproc-per-node 2 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ulysses-degree 2 --ring-degree 1 --scheduler unipc                        --output cat_par_ulysses2_unipc_eager.mp4
+torchrun --nproc-per-node 2 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ulysses-degree 2 --ring-degree 1 --scheduler unipc --teacache             --output cat_par_ulysses2_unipc_teacache.mp4
+torchrun --nproc-per-node 2 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ulysses-degree 2 --ring-degree 1 --scheduler unipc --compile --compile-mode default         --output cat_par_ulysses2_unipc_jit_default.mp4
+torchrun --nproc-per-node 2 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ulysses-degree 2 --ring-degree 1 --scheduler unipc --compile --compile-mode reduce-overhead --output cat_par_ulysses2_unipc_jit_reduce_overhead.mp4
+torchrun --nproc-per-node 2 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ulysses-degree 2 --ring-degree 1 --scheduler unipc --compile --compile-mode max-autotune    --output cat_par_ulysses2_unipc_jit_max_autotune.mp4
+
+# --- scheduler: dpm ---
+torchrun --nproc-per-node 2 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ulysses-degree 2 --ring-degree 1 --scheduler dpm                          --output cat_par_ulysses2_dpm_eager.mp4
+torchrun --nproc-per-node 2 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ulysses-degree 2 --ring-degree 1 --scheduler dpm --teacache               --output cat_par_ulysses2_dpm_teacache.mp4
+torchrun --nproc-per-node 2 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ulysses-degree 2 --ring-degree 1 --scheduler dpm --compile --compile-mode default           --output cat_par_ulysses2_dpm_jit_default.mp4
+torchrun --nproc-per-node 2 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ulysses-degree 2 --ring-degree 1 --scheduler dpm --compile --compile-mode reduce-overhead   --output cat_par_ulysses2_dpm_jit_reduce_overhead.mp4
+torchrun --nproc-per-node 2 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ulysses-degree 2 --ring-degree 1 --scheduler dpm --compile --compile-mode max-autotune     --output cat_par_ulysses2_dpm_jit_max_autotune.mp4
+
+# ---------------------------------------------------------------------------
+# Ring-only, 4 GPUs  (torchrun --nproc-per-node 4, --ring-degree 4)
+# ---------------------------------------------------------------------------
+
+# --- scheduler: default ---
+torchrun --nproc-per-node 4 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ring-degree 4                                          --output cat_par_ring4_default_eager.mp4
+torchrun --nproc-per-node 4 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ring-degree 4 --teacache                               --output cat_par_ring4_default_teacache.mp4
+torchrun --nproc-per-node 4 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ring-degree 4 --compile --compile-mode default          --output cat_par_ring4_default_jit_default.mp4
+torchrun --nproc-per-node 4 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ring-degree 4 --compile --compile-mode reduce-overhead  --output cat_par_ring4_default_jit_reduce_overhead.mp4
+torchrun --nproc-per-node 4 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ring-degree 4 --compile --compile-mode max-autotune    --output cat_par_ring4_default_jit_max_autotune.mp4
+
+# --- scheduler: unipc ---
+torchrun --nproc-per-node 4 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ring-degree 4 --scheduler unipc                        --output cat_par_ring4_unipc_eager.mp4
+torchrun --nproc-per-node 4 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ring-degree 4 --scheduler unipc --teacache             --output cat_par_ring4_unipc_teacache.mp4
+torchrun --nproc-per-node 4 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ring-degree 4 --scheduler unipc --compile --compile-mode default         --output cat_par_ring4_unipc_jit_default.mp4
+torchrun --nproc-per-node 4 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ring-degree 4 --scheduler unipc --compile --compile-mode reduce-overhead --output cat_par_ring4_unipc_jit_reduce_overhead.mp4
+torchrun --nproc-per-node 4 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ring-degree 4 --scheduler unipc --compile --compile-mode max-autotune    --output cat_par_ring4_unipc_jit_max_autotune.mp4
+
+# --- scheduler: dpm ---
+torchrun --nproc-per-node 4 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ring-degree 4 --scheduler dpm                          --output cat_par_ring4_dpm_eager.mp4
+torchrun --nproc-per-node 4 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ring-degree 4 --scheduler dpm --teacache               --output cat_par_ring4_dpm_teacache.mp4
+torchrun --nproc-per-node 4 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ring-degree 4 --scheduler dpm --compile --compile-mode default           --output cat_par_ring4_dpm_jit_default.mp4
+torchrun --nproc-per-node 4 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ring-degree 4 --scheduler dpm --compile --compile-mode reduce-overhead   --output cat_par_ring4_dpm_jit_reduce_overhead.mp4
+torchrun --nproc-per-node 4 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ring-degree 4 --scheduler dpm --compile --compile-mode max-autotune     --output cat_par_ring4_dpm_jit_max_autotune.mp4
+
+# ---------------------------------------------------------------------------
+# Unified Sequence Parallelism, 4 GPUs  (torchrun --nproc-per-node 4, --ulysses-degree 2 --ring-degree 2)
+# ---------------------------------------------------------------------------
+
+# --- scheduler: default ---
+torchrun --nproc-per-node 4 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ulysses-degree 2 --ring-degree 2                                          --output cat_par_unified4_default_eager.mp4
+torchrun --nproc-per-node 4 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ulysses-degree 2 --ring-degree 2 --teacache                               --output cat_par_unified4_default_teacache.mp4
+torchrun --nproc-per-node 4 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ulysses-degree 2 --ring-degree 2 --compile --compile-mode default          --output cat_par_unified4_default_jit_default.mp4
+torchrun --nproc-per-node 4 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ulysses-degree 2 --ring-degree 2 --compile --compile-mode reduce-overhead  --output cat_par_unified4_default_jit_reduce_overhead.mp4
+torchrun --nproc-per-node 4 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ulysses-degree 2 --ring-degree 2 --compile --compile-mode max-autotune    --output cat_par_unified4_default_jit_max_autotune.mp4
+
+# --- scheduler: unipc ---
+torchrun --nproc-per-node 4 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ulysses-degree 2 --ring-degree 2 --scheduler unipc                        --output cat_par_unified4_unipc_eager.mp4
+torchrun --nproc-per-node 4 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ulysses-degree 2 --ring-degree 2 --scheduler unipc --teacache             --output cat_par_unified4_unipc_teacache.mp4
+torchrun --nproc-per-node 4 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ulysses-degree 2 --ring-degree 2 --scheduler unipc --compile --compile-mode default         --output cat_par_unified4_unipc_jit_default.mp4
+torchrun --nproc-per-node 4 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ulysses-degree 2 --ring-degree 2 --scheduler unipc --compile --compile-mode reduce-overhead --output cat_par_unified4_unipc_jit_reduce_overhead.mp4
+torchrun --nproc-per-node 4 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ulysses-degree 2 --ring-degree 2 --scheduler unipc --compile --compile-mode max-autotune    --output cat_par_unified4_unipc_jit_max_autotune.mp4
+
+# --- scheduler: dpm ---
+torchrun --nproc-per-node 4 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ulysses-degree 2 --ring-degree 2 --scheduler dpm                          --output cat_par_unified4_dpm_eager.mp4
+torchrun --nproc-per-node 4 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ulysses-degree 2 --ring-degree 2 --scheduler dpm --teacache               --output cat_par_unified4_dpm_teacache.mp4
+torchrun --nproc-per-node 4 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ulysses-degree 2 --ring-degree 2 --scheduler dpm --compile --compile-mode default           --output cat_par_unified4_dpm_jit_default.mp4
+torchrun --nproc-per-node 4 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ulysses-degree 2 --ring-degree 2 --scheduler dpm --compile --compile-mode reduce-overhead   --output cat_par_unified4_dpm_jit_reduce_overhead.mp4
+torchrun --nproc-per-node 4 wan2_text_to_video_parallel.py "$PROMPT" --num-frames 81 --fps 16 --dtype bfloat16 --monitor-memory --steps 50 --guidance-scale 5.0 --seq-parallel --ulysses-degree 2 --ring-degree 2 --scheduler dpm --compile --compile-mode max-autotune     --output cat_par_unified4_dpm_jit_max_autotune.mp4
