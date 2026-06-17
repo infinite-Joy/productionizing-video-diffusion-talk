@@ -15,6 +15,7 @@ Acceleration knobs (opt-in):
                        parallel. Requires guidance_scale > 1.0.
   4. --teacache        Skip redundant denoising compute (experimental).
   5. --compile         JIT torch.compile the DiT (regional; compiles on 1st run).
+                       Use --compile-backend to select inductor (default) or tensorrt.
   6. --seq-parallel    Unified Sequence Parallelism: splits the attention sequence
                        across N GPUs using a combination of Ulysses all-to-all and
                        Ring attention. Requires torchrun. Mutually exclusive with
@@ -407,6 +408,7 @@ def generate_video(
     ring_degree: int = 2,
     # --- compile / profile ---
     compile: bool = False,
+    compile_backend: str = "inductor",
     compile_mode: str = "default",
     compile_vae: bool = False,
     warmup: int | None = None,
@@ -481,14 +483,19 @@ def generate_video(
         enable_teacache(pipe, teacache_threshold)
 
     # --- torch.compile (JIT, regional) --------------------------------------
+    _trt_backend = compile_backend in ("tensorrt", "torch_tensorrt", "aot_torch_tensorrt_aten")
     if compile:
+        if _trt_backend:
+            import torch_tensorrt  # registers tensorrt backends with torch._dynamo  # noqa: F401
         torch.set_float32_matmul_precision("high")
-        print(f"Compiling DiT repeated blocks (mode={compile_mode!r}) — first step is slow.")
+        print(f"Compiling DiT repeated blocks "
+              f"(backend={compile_backend!r}, mode={compile_mode!r}) — first step is slow.")
         pipe.transformer.compile_repeated_blocks(
-            mode=compile_mode, fullgraph=False, dynamic=False)
+            backend=compile_backend, mode=compile_mode, fullgraph=False, dynamic=False)
         if compile_vae:
             pipe.vae.decoder = torch.compile(
-                pipe.vae.decoder, mode=compile_mode, fullgraph=False, dynamic=False)
+                pipe.vae.decoder, backend=compile_backend,
+                mode=compile_mode, fullgraph=False, dynamic=False)
 
         if compile_mode in ("reduce-overhead", "max-autotune"):
             def _mark_step_begin(_mod, _args, _kwargs):
@@ -574,24 +581,47 @@ def generate_video(
     _gen_start = _time.perf_counter()
 
     if profile:
+        import contextlib
         import os
         from torch.profiler import (profile as torch_profile, ProfilerActivity,
                                     tensorboard_trace_handler)
 
         os.makedirs(profile_dir, exist_ok=True)
         print(f"Profiling enabled → writing traces to {profile_dir}")
+
+        if compile and _trt_backend:
+            import torch_tensorrt as _trt  # noqa: F401 (may already be imported)
+            trt_debug_dir = os.path.join(profile_dir, "trt_debug")
+            print(f"TensorRT debugger enabled → writing traces to {trt_debug_dir}")
+            _trt_ctx = _trt.dynamo.Debugger(
+                logging_dir=trt_debug_dir,
+                save_engine_profile=True,
+                profile_format="perfetto",
+                save_layer_info=True,
+            )
+        else:
+            _trt_ctx = contextlib.nullcontext()
+
         with torch_profile(
             activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
             record_shapes=True, profile_memory=True, with_stack=True,
-            on_trace_ready=tensorboard_trace_handler(profile_dir),
+            # on_trace_ready=tensorboard_trace_handler(profile_dir),
         ) as prof:
-            result = _run_pipe()
+            with _trt_ctx:
+                result = _run_pipe()
         print("\n=== Top 20 ops by CUDA time ===")
-        print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=20))
-        chrome_trace = os.path.join(profile_dir, "trace.json")
+        # print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=20))
+        _backend_tag = compile_backend if compile else "eager"
+        _ts = _time.strftime("%Y%m%d_%H%M%S")
+        chrome_trace = os.path.join(
+            profile_dir,
+            f"trace_{_backend_tag}_{width}x{height}_{num_frames}f_{num_inference_steps}steps_{_ts}.json"
+        )
         prof.export_chrome_trace(chrome_trace)
         print(f"Chrome trace: {chrome_trace}")
         print(f"TensorBoard:  tensorboard --logdir {profile_dir}")
+        if compile and _trt_backend:
+            print(f"TensorRT traces: {trt_debug_dir}")
     else:
         result = _run_pipe()
 
@@ -687,6 +717,10 @@ if __name__ == "__main__":
     # compile / profile
     parser.add_argument("--compile", action="store_true",
                         help="JIT torch.compile the DiT via regional compilation.")
+    parser.add_argument("--compile-backend", type=str, default="inductor",
+                        help="torch.compile backend (default: 'inductor'). Common options: "
+                             "inductor, cudagraphs, openxla, tvm, tensorrt (requires "
+                             "torch-tensorrt). Run torch._dynamo.list_backends() to see all.")
     parser.add_argument("--compile-mode", type=str, default="default",
                         choices=["default", "reduce-overhead", "max-autotune"],
                         help="torch.compile mode.")
@@ -726,6 +760,7 @@ if __name__ == "__main__":
         ulysses_degree=args.ulysses_degree,
         ring_degree=args.ring_degree,
         compile=args.compile,
+        compile_backend=args.compile_backend,
         compile_mode=args.compile_mode,
         compile_vae=args.compile_vae,
         warmup=args.warmup,
