@@ -2,27 +2,11 @@
 
 **Audience:** Python developers, mostly comfortable with PyTorch and HuggingFace, mixed familiarity with CUDA / GPU internals.
 **Format:** ~45-minute talk with live demo blocks.
-**Goal:** Convince the audience that with SGLang Diffusion, *any* Python developer can stand up a production-grade, OpenAI-compatible video diffusion API — and along the way teach the systems concepts (profiling → torch.compile → FlashAttention → custom kernels → serving) that make it 1.2×–5.9× faster than vanilla `diffusers`.
+**Goal:** There are currently huge gaps in the diffusion landscape and massive innovation in this space is the need of the hour.
 
 ---
 
-## Environment Setup — Lessons Learned
-
-### What we discovered on the demo box
-
-
-| Issue                                                    | Root cause                                                      | Resolution                                                                                                  |
-| -------------------------------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `docker pull` fails: "Cannot connect to Docker daemon"   | Docker daemon not running                                       | `sudo dockerd &` attempted                                                                                  |
-| `sudo dockerd` fails: iptables permission denied         | Box is a managed container/VM without full root iptables access | **Skip Docker entirely** — use native pip install                                                           |
-| `systemctl` not found                                    | No systemd in this environment                                  | Confirmed: managed container, not fixable                                                                   |
-| `uv pip install` fails: "No virtual environment found"   | uv defaults to requiring a venv                                 | Use `uv venv bangpyper-env` then activate                                                                   |
-| `outlines-core` build fails: "can't find Rust compiler"  | outlines-core 0.1.26 needs Rust to build from source            | Install Rust via `rustup` first                                                                             |
-| `huggingface-cli` deprecated                             | Newer `huggingface_hub` ships `hf` CLI instead                  | Use `hf download`, `hf auth login` etc.                                                                     |
-| `from sglang.multimodal_gen import VideoGenerator` fails | Import path changed in current SGLang version                   | **Use diffusers for baseline profiling** (better talk narrative anyway); find correct SGLang API separately |
-
-
-### Confirmed working setup recipe
+## Environment Setup
 
 ```bash
 # install uv
@@ -89,20 +73,22 @@ An alternate title could have been what is the current gap in the market in term
 
 and that is AI inference.
 
-My friends here at frontiersmind have trained the best model for the indian space. which is great. we absolutely need it.
+But the money gets made when there are real users in a real application and when the models are running in production. Only then are the efforts spent during training are also realised. Only then are we able to earn money.
 
-but the money gets made when there are real users in a real application and when the models are running in production. only then are the efforts spent during training are also realised. only then are we able to earn money.
+If you are a seasoned dev or a junior dev in software or a researcher i urge you to start with inference.
 
-if you are a seasoned dev or a junior dev in software or a researcher i urge you to start with inference.
-
-and within inference LLM inference has its own challenges and diffusion has its own challenges. still there are many libraries out there which are trying to solve this. the most famous being vLLM. within the diffusion space there is not much options. sglang is there but the diffusion part just opened towards the start of this year. would be happy to be corrected here, but very few companies are working on the diffusion inference front which is also telling about the complexity involved.
+Within inference LLM inference has its own challenges and diffusion has its own challenges. In the autoregressive space there are many libraries out there which are trying to solve this. The most famous being vLLM. But within the diffusion space there are not much options. Sglang is there but the diffusion part just opened towards the start of this year. I would be happy to be corrected here, but very few companies are working on the diffusion inference front which is also telling about the complexity involved.
 
 
 ---
 
 ## Block 0 — The Hook (3 min)
 
-Open with the terminal already showing the **Eplain diffusers baseline running live** (or play the pre-recorded output if time is tight):
+You can get the code related to this talk here: https://github.com/infinite-Joy/productionizing-video-diffusion-talk
+
+<img src="running_diffusion.png" width="500"/>
+
+Open the terminal and run this command. At 16 fps and 81 frames this means 5 sec video.
 
 ```bash
 uv run python wan2_text_to_video.py \
@@ -110,7 +96,7 @@ uv run python wan2_text_to_video.py \
   --num-frames 81 --fps 16 --output output.mp4
 ```
 
-Let the progress bar tick — 50 denoising steps, ~1:11 total — while you narrate:
+While the progress bar is ticking for 50 steps let me ask a question.
 
 Question to audience: I am assuming that most of you have run some form of LLMs. how many have not run an LLM ever maybe using huggingface or something. You know the general autoregressive pipeline right? this is the autoregressive pipeline.
 
@@ -124,13 +110,91 @@ Show the output video. Then open the pre-baked Perfetto trace (`profiles/wan21_t
 
 ---
 
+### what is Diffusion
+
+Now let me go over the what is a diffusion model and give a small refresher.
+
+In diffusion models, you go from some Gaussian noise to the image that you want to generate. The current state of the art in diffusion model is what are called the flow models. The models essentially knows the vector field or the direction of movement that tells you how a sample should move through latent space in time. This is given by an ODE and during diffusion, you solve this ODE to map out the trajectory. There are solvers to solve this such as the Eulers method. In the Eulers method, you observe the position that you are in and calculate the force you are feeling. Then you take a small step in the direction that you are moving:
+
+x(t + Δt) ≈ x(t) + Δt · f(x, t)
+
+There are more advanced solvers now but the core concept is this.
+
+### Difference between Diffusion and Auto Regressive Process
+
+<img src="Firefly_Gemini Flash_Split-screen infographic comparing two AI generation methods, left side warm amber ba 240169.png" width="500"/>
+
+So you can see that the diffusion process is an iterative denoising process where we start from gaussian noise and we iterate over a fixed number of steps to arrive at the final image. This is in contrast to the Auto Regressive generation process, where whatever is generated till now, we loop back to the model to predict the next token.
+
+Some more differences between Autoregressive pipeline and the Diffusion pipeline
+
+| Aspect                      | Autoregressive LLM              | Diffusion Transformer (DiT)            |
+| --------------------------- | ------------------------------- | -------------------------------------- |
+| Generation primitive        | Predict next token              | Predict denoised latent for all tokens |
+| Generation granularity      | Local, sequential               | Global, parallel                       |
+| Iterations / output         | 100s–1000s token decoding steps | 25–50 denoising iterations             |
+| Per-step compute            | Small                           | Very large                             |
+| Sequence processed per step | 1 new token + KV cache          | Entire latent sequence                 |
+| Memory bottleneck           | KV cache growth                 | Attention matrix growth                |
+| Scaling challenge           | Long contexts                   | Long sequences                         |
+| Decode behavior             | Memory-bound                    | Compute-bound                          |
+
+Now I want to spend couple of minutes on the gap between AR generation and diffusion
+
+The fundamental split is compute-bound vs memory-bound. LLM decode is memory-bandwidth-bound — you're streaming weights and the KV cache regardless, so adding more sequences to a batch is nearly free throughput. That's why continuous batching is such a windfall. Diffusion backbones (UNet/DiT) are compute-bound: each denoising step is a big dense FLOP load over a large spatial latent, and a single high-res sample can already saturate the GPU's matmul units. Batching doesn't give you the free lunch it gives LLMs — you're trading latency for throughput much more directly, and GPU-seconds-per-image stays high no matter how clever you are.
+
+On top of that structural fact, several things compound:
+
+Activation memory scales with resolution, and explodes for video. Spatial attention is quadratic in the number of latent tokens. A high-res image is already a lot; a multi-second clip with spatiotemporal attention across frames is brutal — you frequently can't fit a clip in memory and have to tile / chunk / sliding-window, which adds complexity and seam artifacts. Text is 1D and modest by comparison.
+No dominant serving stack. There's no vLLM-for-diffusion. People run diffusers (a reference/research library, not a throughput engine), ComfyUI for workflows, some TensorRT. Nothing consolidates paged memory + continuous batching + production scheduling the way the LLM stack does. The engineering investment is an order of magnitude smaller, and it's fragmented.
+
+The pipeline is heterogeneous. An LLM is basically one homogeneous transformer. A diffusion request is text encoder(s) → diffusion backbone (×N steps) → VAE decode, often plus a refiner, upscaler, safety checker. Batching and pipelining efficiently across those uneven stages is genuinely messy.
+
+Batching is hard even when you want it. Continuous batching works for LLMs because requests join/leave at token granularity and share prefixes. Diffusion requests march in lockstep through N steps, and they differ in resolution, aspect ratio, step count, and conditioning — variable tensor shapes break uniform packing. You can't interleave a half-finished request the way you can with token streams.
+Quantization is less plug-and-play. INT4/FP8 for LLMs is mature and mostly lossless-enough. Diffusion is more sensitive — quality degrades and errors compound across the iterative trajectory. Approaches like SVDQuant exist but it's not the press-a-button win it is for text.
+Cross-step caching is only an approximation. DeepCache and friends exploit that high-level features change slowly between adjacent steps, but that's a quality/speed tradeoff, not the exact, free reuse a KV cache gives autoregressive decode.
+
+Video is where all of this turns from "gap" into "frontier." Temporal consistency demands attention across frames, memory and compute scale with clip length, and long-form generation is still an open systems problem, not a solved serving problem. That's the sharpest end of the gap right now.
+
+The math of fast sampling is well-studied, but the systems economics with its compute-bound backbones, no batching free-lunch, immature serving infra, heterogeneous pipelines, and video's memory wall are where diffusion inference is genuinely years behind where LLM serving is.
+
+---   
+
+### The diffusion gap (India and World)
+
+Now the obvious question from here is based on this what are the ways to make a diffusion pipeline faster. I would like from someone who has primarily worked with LLM pipelines or has more knowledge of LLMs and has never worked at a diffusion pipeline.
+
+I want to talk about intelligence a little bit here. When you see tokens coming out of some AI product, its less like a SAAS product and more like an AI factory. There are lots of infrastructure and innovation that needs to go to the backend to make the tokens cheap enough for you to consume.
+
+<img src="Firefly image 2026-06-12 00-54 962051 MEm.jpg" width="500"/>
+
+1. At the very basic level there is the Physical layer which is the raw silicon. These are the chips that do the actual computation for training and inference. Examples are NVIDIA (H100/B200), AMD (MI300X), Qualcomm Edge NPUs, Cerebras (cerebras.ai), and Groq (groq.com) for fast inference. This is the foundation everything else runs on. In India, Krutrim has announced plans to develop India's first homegrown family of chips for AI, general compute and edge. QpiAI (qpiai.tech) works on AI plus quantum hardware including quantum processors.
+
+2. The second is the link layer. This is the infrastructure that links many chips together into a usable cluster for a multi GPU training fabric and data pipeline at scale. Cloud/compute providers such as CoreWeave (coreweave.com), Lambda (lambda.ai), Together AI (together.ai), Voltage Park (voltagepark.com), Crusoe Energy (crusoe.ai) live here. They rent out and orchestrate the physical hardware. In India, we have Yotta / Shakti Cloud (yotta.com). The Hiranandani Group-backed data center giant is deploying over 20,000 NVIDIA Blackwell Ultra GPUs across campuses in Greater Noida and Navi Mumbai. Krutrim has shifted toward cloud infrastructure and reports growing enterprise demand. E2E Networks (e2enetworks.com) and Neysa (neysa.ai) are each deploying 20,000+ NVIDIA Blackwell Ultra GPUs. Much of this is enabled by the government's IndiaAI Mission, which provides GPU compute at subsidised rates of roughly Rs 115–150 per GPU-hour, with a target of 100,000 GPUs by end of 2026.
+
+3. The third is the actual model architectures. For diffusion models specifically, this means things like DiT (diffusion transformers), U-Net, VAE, and flow matching. Examples are Stability AI (Stable Diffusion), Black Forest Labs (FLUX), OpenAI (DALL·E/Sora), Genmo (Mochi), Alibaba (Wan), and Google (Imagen/Veo). Some model creation has been done in the LLM space in India, but currently there are no models in the diffusion space.
+
+4. The fourth is about building the context or memory layer that conditions or steers a base model toward a desired output without retraining it from scratch. For diffusion (image/video) this means ControlNet, LoRA fine-tunes, embeddings, and IP-Adapters, with resources like Civitai (LoRA hub), Hugging Face, LAION datasets, and Scenario (game assets). For LLM-based and agentic systems, it also includes persistent memory layers like mem0 (mem0.ai), which inject a user's prior facts, preferences, and history into the prompt at inference time. This is the layer where you supply specific knowledge, style, or state. Currently there are no major players from India in this space.
+
+5. Then comes the agentic and orchestration layer. These are tools that wrap the models in iterative, goal-directed loops—editing loops and agentic creative workflows that refine output over multiple steps. The focus is on making individual model calls into production workflows. Examples such as Jasper (brand AI), Canva Magic Studio, Lightricks (LTX-Video), Krea AI, Photoroom, Vizcom (industrial design). 
+
+6. The top layer is the application space with end user creative products. The companies here are Midjourney, Runway, Pika, Kling, Elevenlabs etc.
+
+In India, related to 5 and 6, there is Segmind (segmind.com). It's a Bengaluru-based platform offering one API key, 490+ AI models, with Indian pricing and payments for image, video, and audio generation. Pixis (pixis.ai) provides codeless AI infrastructure for marketing campaigns; has raised $209 Mn.  Rephrase.ai is a AI video/avatar generation, recently acquired by Adobe. Trupeer (trupeer.ai), turns screen recordings into polished videos with AI-generated scripts, voiceovers, and visuals. Murf AI (murf.ai) is for AI voice/audio and an analog to ElevenLabs/Suno.
+
+Intelligence is supported by all these massive list of companies out there. But dont be intimidated by this slide. its not enough. There are huge gaps.
+
+We need exponential more innovation to democratise intelligence and to make intelligence truly useful. For this we need lots of companies.
+
+---
+
 ## Block 2 — Torch Profiling (6 min)
 
-### Narrative pivot — profile diffusers first, then show SGLang's answer
-
-This is the key insight from our setup work: **profile the vanilla diffusers baseline**. This is actually a better talk narrative — "here's what's slow, and here's what SGLang does about it."
-
 ### Profiling script (confirmed working approach)
+
+We cannot improve anything till we understand it deeply. Hence the first step must be to profile the code. A profile removes assumptions about the code and shows us exactly which portions take how much time and memory. There are many profilers out there, but the most basic is the torch profiler. A good beginners guide in case you have never looked at a torch profile is by the huggingface folks https://huggingface.co/blog/torch-profiler
+
+Here is the code to profile the overall pipeline. To profile you need to create the profiler context and add the identifiers to the hooks that you want to capture. Within the profiling code, you can annotate specific portions of the code so that it is easier to read in the profile trace. For the output,  you can print the key averages or export the chrome trace. I generally like the chrome trace better gives me a more holistic viewpoint of the overall pipeline.
 
 ```python
 # profile_wan21.py — saves traces into ./profiles/
@@ -215,16 +279,6 @@ Point out:
 
 This pipeline shape — **Encoder → N × DiT → Decoder** — is universal: FLUX, HunyuanVideo, CogVideoX, Wan2.1. Fix the DiT loop once and the win applies everywhere.
 
-Then flip to a single slide listing the optimization layers:
-
-1. **Profile** — find the hot path
-2. **`torch.compile`** — fuse the kernel graph
-3. **FlashAttention** — tame the O(L²) attention bottleneck
-4. **Triton / CUDA kernels** — fuse the residual ops
-5. **SGLang** — production serving with all of the above + multi-GPU
-
-> *"By the end of this talk, we're going to peel back each layer and understand why it works — and then hand the whole stack to a single Python package. Let's profile first."*
-
 **Baseline numbers to anchor the room:**
 - 50 steps × 1.42 s/step = ~71 s wall-clock for a 5-second clip
 - Hardware: H100 80 GB (or equivalent)
@@ -238,65 +292,25 @@ Then flip to a single slide listing the optimization layers:
 
 ---
 
-### The diffusion gap (India and World)
-
-Now the obvious question from here is based on this what are the ways to make a diffusion pipeline faster. I would like from someone who has primarily worked with LLM pipelines or has more knowledge of LLMs and has never worked at a diffusion pipeline.
-
-Intelligence is supported by all these massive list of companies out there. But dont be intimidated by this slide. its not enough. There are huge gaps.
-
-<img src="Firefly_Gemini%20Flash_the%207%20layers%20of%20an%20AI%20factory,%20you%20need%20all%20of%20these%20to%20work%20in%20tandem%20to%20bring%20you%20i%20240169.png" width="500"/>
-
-We need exponential more innovation to democratise intelligence and to make intelligence truly useful. For this we need lots of companies.
-
----
-
-## Block 1 — Diffusion vs Autoregressive LLM Inference (5 min)
-
-Frame the key insight: most Python devs think "LLM inference = predict next token from a KV-cache." Video diffusion is fundamentally different, and that difference dictates every optimization that follows.
-
-### Side-by-side comparison (one slide)
-
-![AR and diffusion](Firefly_Gemini%20Flash_Split-screen%20infographic%20comparing%20two%20AI%20generation%20methods,%20left%20side%20warm%20amber%20ba%20240169.png)
-
-
-| Aspect                | Autoregressive LLM (Llama, Qwen)  | Diffusion DiT (Wan2.1, FLUX, HunyuanVideo)                              |
-| --------------------- | --------------------------------- | ----------------------------------------------------------------------- |
-| Generation primitive  | One token at a time               | One denoising step over the **whole** latent                            |
-| Iterations per output | `output_len` tokens (100s–1000s)  | 25–50 denoising steps                                                   |
-| Per-step compute      | Tiny (1 token × hidden) at decode | **Huge** — full sequence forward each step                              |
-| Sequence length       | Grows monotonically with KV cache | **Fixed and very long from step 0** (Wan2.1 720p 5s ≈ 74K tokens)       |
-| Memory bottleneck     | KV cache (O(L) growth)            | Activations + attention scores (O(L²) inside attention)                 |
-| Cache                 | RadixAttention / PagedAttention   | **No KV cache**; timestep embedding + optional feature-cache (TeaCache) |
-| Compute pattern       | Memory-bound at decode            | **Compute-bound** at every step                                         |
-| Bottleneck op         | attention + MoE all-to-all        | self-attention (>76% of DiT FLOPs in 1.3B; ~91% in 14B)                 |
-
-
-### What this means for serving
+## Six levers of diffusion latency - What this means for serving
 
 So now based on the profile what are the ways in which we can improve the latency of creation of these video models.
 
-- Speed-ups come from: (a) fewer denoising steps, (b) faster *each* step (compile, FlashAttn, fused kernels, quantization), (c) sharding the long sequence across GPUs (USP, CFG-parallel, TP).
+Speed-ups come from: 
 
-Now I want to spend couple of minutes on the gap between AR generation and diffusion
-
-The fundamental split is compute-bound vs memory-bound. LLM decode is memory-bandwidth-bound — you're streaming weights and the KV cache regardless, so adding more sequences to a batch is nearly free throughput. That's why continuous batching is such a windfall. Diffusion backbones (UNet/DiT) are compute-bound: each denoising step is a big dense FLOP load over a large spatial latent, and a single high-res sample can already saturate the GPU's matmul units. Batching doesn't give you the free lunch it gives LLMs — you're trading latency for throughput much more directly, and GPU-seconds-per-image stays high no matter how clever you are.
-On top of that structural fact, several things compound:
-
-Activation memory scales with resolution, and explodes for video. Spatial attention is quadratic in the number of latent tokens. A high-res image is already a lot; a multi-second clip with spatiotemporal attention across frames is brutal — you frequently can't fit a clip in memory and have to tile / chunk / sliding-window, which adds complexity and seam artifacts. Text is 1D and modest by comparison.
-No dominant serving stack. There's no vLLM-for-diffusion. People run diffusers (a reference/research library, not a throughput engine), ComfyUI for workflows, some TensorRT. Nothing consolidates paged memory + continuous batching + production scheduling the way the LLM stack does. The engineering investment is an order of magnitude smaller, and it's fragmented.
-The pipeline is heterogeneous. An LLM is basically one homogeneous transformer. A diffusion request is text encoder(s) → diffusion backbone (×N steps) → VAE decode, often plus a refiner, upscaler, safety checker. Batching and pipelining efficiently across those uneven stages is genuinely messy.
-Batching is hard even when you want it. Continuous batching works for LLMs because requests join/leave at token granularity and share prefixes. Diffusion requests march in lockstep through N steps, and they differ in resolution, aspect ratio, step count, and conditioning — variable tensor shapes break uniform packing. You can't interleave a half-finished request the way you can with token streams.
-Quantization is less plug-and-play. INT4/FP8 for LLMs is mature and mostly lossless-enough. Diffusion is more sensitive — quality degrades and errors compound across the iterative trajectory. Approaches like SVDQuant exist but it's not the press-a-button win it is for text.
-Cross-step caching is only an approximation. DeepCache and friends exploit that high-level features change slowly between adjacent steps, but that's a quality/speed tradeoff, not the exact, free reuse a KV cache gives autoregressive decode.
-
-Video is where all of this turns from "gap" into "frontier." Temporal consistency demands attention across frames, memory and compute scale with clip length, and long-form generation is still an open systems problem, not a solved serving problem. That's the sharpest end of the gap right now.
-So the honest framing: the math of fast sampling is well-studied, but the systems economics — compute-bound backbones, no batching free-lunch, immature serving infra, heterogeneous pipelines, and video's memory wall — are where diffusion inference is genuinely years behind where LLM serving is. If you want, I can pull current numbers on where realized throughput/latency lands for a specific model (say, a current DiT image model or a video model) to make the gap concrete.
-
+- (a) Fewer denoising steps
+- (b) Faster *each* step (compile, FlashAttn, fused kernels, quantization)
+- (c) Less overhead for the overall pipeline
+- (d) Parallel processing
+- (e) Better systems engineering
+- (f) Better hardware
 
 
 ## Block 3 — `torch.compile` Benefits (6 min)
 
-### The 1-line story
+### The 1-line change
+
+![torch compile speedup](speedup_by_compile.png)
 
 ```python
 pipe.transformer.compile(fullgraph=True)
@@ -304,10 +318,12 @@ pipe.transformer.compile(fullgraph=True)
 
 On an H100, FLUX-1-Dev: 6.7s → 4.5s, ~1.5× speedup, no quality change. Compile *only* the DiT — text encoders and VAE are <5% of runtime.
 
+In the above benchmarks, you can see that the just in time compiler is 1.53x faster than the eager pytorch mode and the just in time compiler with reduce overhead mode is 1.4x faster for the distilled model (Causvid). Thus torch compiler optimises for your specific workload.
+
 ### What torch.compile actually does for diffusion
 
 1. **Graph capture (Dynamo).** Traces the Python forward pass into an FX graph.
-2. **Operator fusion (Inductor + Triton).** Fuses `silu → mul → add_norm` into one kernel. Kernel-launch overhead disappears.
+2. **Operator fusion (Inductor + Triton).** Fuses simple operations such as `silu → mul → add_norm` into one kernel. Kernel-launch overhead disappears.
 3. **CUDA graph capture.** `mode="reduce-overhead"` removes Python overhead for the entire denoising step.
 4. **Specialization.** Compiles for an exact (B, H, W) shape.
 
@@ -351,11 +367,170 @@ for block in pipe.transformer.transformer_blocks:
     block.compile(fullgraph=True)
 ```
 
-### Live demo
+### TensorRT — Inductor's main alternative on NVIDIA hardware
 
-- Run `pipe(...)` once → time it (e.g., 6.7s).
-- Add `pipe.transformer.compile(fullgraph=True)`, run twice (first pays compile cost, second is steady state) → time it (e.g., 4.5s).
-- Show how SGLang Diffusion bakes this in: `--enable-torch-compile` flag.
+Since most of you will be on NVIDIA hardware, a natural question is: why not use TensorRT instead of Inductor as the backend? The short answer is: TRT is a legitimate choice, but the trade-offs are real.
+
+**The fundamental difference in fusion strategy**
+
+I profiled Wan2.1-T2V-1.3B (30 transformer blocks, ~5276 ops) compiled with both backends:
+
+| | Inductor | TensorRT |
+|---|---|---|
+| Output | **23 Triton kernels** | **1 monolithic TRT engine** |
+| Fusion happens at | compile time, across blocks | engine build time, inside the engine |
+| Torch fallback segments | 0 | 0 |
+
+Both cover 100% of ops with zero fallback. So what's actually different?
+
+**A concrete example — RoPE (Rotary Position Embedding)**
+
+Inductor sees the full unrolled graph across all 30 blocks and emits **one single Triton kernel launch** that computes the entire RoPE frequency table for all blocks simultaneously — 684 source nodes fused into one `triton_poi` kernel.
+
+TensorRT converts the same ops individually and then fuses them internally at engine build time. For RoPE alone that's 920 reshape ops + 548 permutes + 308 slices + more — roughly **1782 TRT layer conversions** for what Inductor does in one launch.
+
+Same story for AdaLN (Adaptive Layer Norm): Inductor fuses norm + scale + shift + chunk for all 30 blocks into one reduction kernel (`triton_red`, 301 nodes). TRT keeps 91 separate Normalization layers plus distinct ElementWise layers for the scale/shift.
+
+**Bottom line on performance**
+
+Inductor wins on *static cross-block fusion*: it sees the entire graph before any kernel is emitted, so it can merge repeated patterns across all N blocks in one shot. TRT's fusion is real but happens inside the engine at a per-op granularity — it can't hoist across block boundaries the way Dynamo/Inductor can.
+
+**Why you might still choose TRT**
+
+- It plays nicely with the rest of the NVIDIA stack: Triton Inference Server, TensorRT-LLM, and NVIDIA's own deployment tooling all expect TRT engines.
+- If your team already runs TRT in production, staying in that ecosystem avoids two different compilation pipelines.
+- TRT can apply hardware-specific optimisations (INT8 calibration, layer-fused attention via cuDNN) that Inductor doesn't expose directly.
+
+**The honest debugging warning**
+
+I found debugging TRT significantly harder. When something goes wrong, you're looking at an opaque binary engine — no Triton source, no readable IR, no `print_readable()`. NVIDIA's hardware is already surprisingly opaque; adding TRT on top compounds that. Inductor at least lets you inspect the generated Triton code and the FX graph.
+
+**My recommendation:** benchmark both on your actual workload. If you're greenfield and not locked into the NVIDIA stack, start with Inductor — better debuggability, comparable performance for DiTs. If you're deploying into an existing TRT/Triton Inference Server pipeline, TRT is the natural fit.
+
+---
+
+## Block 5 — Custom Triton / CUDA Kernels on the Hot Path
+
+### What's left after compile + FlashAttention?
+
+Look back at the profile — the residual hot path:
+
+1. **RoPE** (rotary embedding) — applied to Q and K every block, every step.
+2. **RMSNorm** — twice per block.
+3. **Quantization** (FP8/INT8/NVFP4) cast + scale.
+4. **AdaLN modulation** — the timestep-conditioning pattern: `x = (1 + scale) * norm(x) + shift`.
+
+All memory-bound, pointwise/reduce ops — perfect for fusion.
+
+### Reference speedups (Liger Kernel benchmarks)
+
+
+| Op                        | Speedup vs unfused | Memory reduction |
+| ------------------------- | ------------------ | ---------------- |
+| Fused RoPE (Triton)       | **8×**             | 3×               |
+| Fused RMSNorm             | **7×**             | 3×               |
+| Fused SwiGLU / GeGLU      | ~2×                | ~2×              |
+| Fused Linear+CrossEntropy | ~2×                | up to 5×         |
+
+
+### Mini Triton kernel demo — fused RMSNorm
+
+```python
+import triton
+import triton.language as tl
+import torch
+
+@triton.jit
+def rmsnorm_fwd(
+    x_ptr, w_ptr, y_ptr,
+    stride, n_cols,
+    eps: tl.constexpr,
+    BLOCK: tl.constexpr,
+):
+    row = tl.program_id(0)
+    cols = tl.arange(0, BLOCK)
+    mask = cols < n_cols
+
+    x = tl.load(x_ptr + row * stride + cols, mask=mask, other=0.0).to(tl.float32)
+    var = tl.sum(x * x, axis=0) / n_cols
+    rstd = 1.0 / tl.sqrt(var + eps)
+    w = tl.load(w_ptr + cols, mask=mask)
+    y = (x * rstd) * w
+    tl.store(y_ptr + row * stride + cols, y, mask=mask)
+
+def rmsnorm(x, w, eps=1e-6):
+    y = torch.empty_like(x)
+    n_rows, n_cols = x.shape
+    BLOCK = triton.next_power_of_2(n_cols)
+    rmsnorm_fwd[(n_rows,)](
+        x, w, y, x.stride(0), n_cols,
+        eps=eps, BLOCK=BLOCK, num_warps=4,
+    )
+    return y
+```
+
+Bench it live:
+
+```python
+x = torch.randn(74000, 1536, device="cuda", dtype=torch.bfloat16)
+w = torch.ones(1536, device="cuda", dtype=torch.bfloat16)
+%timeit torch.nn.functional.rms_norm(x, [1536], w)   # ~0.5 ms
+%timeit rmsnorm(x, w)                                # ~0.07 ms
+```
+
+colab notebook related to this:
+https://colab.research.google.com/drive/1LsrhwqFaCu-iVUm4BxWHOYqOkUey7BOM#scrollTo=ABMI6grU5iMU
+
+
+There are some points here. Why are we doing this?
+
+1. Because we can now. writing cuda code is hard, but there has been an explosion of DSLs which are trying to make the computations fast and will be productive from a coding POV. Before 2026 this was not possible.
+2. cudnn although quite good will still rely on some heuristics. Its always worth it to go through your production usage, and then create the kernel that is exactly inline with that. That will be the best.
+3. even if you fail, you would have proven that better than this is not possible and the exact reasons for that.
+4. in the proces you will learn a lot of things about the hardware that you are using. not caring about the hardware where you are running is pre 2025. Now you want to run the software that best gels with the hardware that you have. its like you may not be usain bolt, but there are latent capabilties that you have that will make you the most efficient and you need to discover the conditions to do that.
+
+---
+
+Step distillation is a way to make a diffusion model produce a good sample in far fewer denoising steps by training a "student" to imitate the result of the full "teacher" trajectory.
+
+**Why diffusion needs many steps in the first place.** Lets recap about the significance of steps in a diffusion model. A diffusion model is trained to reverse a noising process. We start from pure Gaussian noise and iteratively denoise down to a clean sample. Inference is essentially integrating the probability-flow ODE backward in time from t=T to t=0. Standard training only teaches the model to remove a *small* amount of noise per step (predict the noise, or in Wan's case the velocity field under flow matching), so each step is a small, safe ODE step. To keep the integration error low you need many of them. Generally 50 steps are run. Take too few large steps with a vanilla model and you get artifacts.
+
+**What distillation changes.** Step distillation retrains the model with a different objective: given a noisy latent at some timestep t, the student's *single* forward pass should land where the teacher would end up after running many steps from t. In other words, the student learns to **jump across large noise intervals in one hop** instead of crawling. That collapses 50 teacher steps into ~8 student steps.
+
+The main families are:
+1. Progressive distillation. Directly teaching a student is difficult, to jump from many steps to a few in a single shot. So we repeatedly train a student to do in one step what the teacher will do in two. Then promote the student to teacher and repeat the process.
+2. consistency distillation / LCM. Here any point on a trajectory maps to its clean endpoint in one eval. Here the teacher is used to get the adjacent point and the student is trained on that output.
+3. distribution-matching distillation (DMD). This trains a few-step student to produce outputs whose distribution matches the teacher's and not whose individual samples match the teacher's trajectories. 
+4. adversarial distillation (SDXL-Turbo style). Both a A score-distillation loss and an adversarial loss is used here.
+
+**CausVid**, used here, is in the distribution-matching distillation family, adapted for video.
+
+**What we're actually doing in this benchmark.** The base model is Wan2.1-T2V-1.3B, which normally runs 50 steps with classifier-free guidance on (guidance_scale 5.0). CFG runs the model *twice* per step — a conditional and an unconditional pass — so that's 50 × 2 = **100 DiT forwards per video**. We then load the **CausVid rank-32 distillation LoRA** and fuse it straight into the base weights at load time (`fuse_lora` → `unload_lora_weights`), so at inference there's no adapter overhead, just modified weights. Two things change:
+
+- **Steps: 50 → 8.** Each step now covers a much larger noise interval, so the whole noise-to-video trajectory needs far fewer hops.
+- **CFG off (guidance_scale 1.0).** The distillation training bakes prompt guidance into the weights, so the separate unconditional pass disappears — killing the 2× per-step cost. That leaves **8 DiT forwards** total.
+
+**The punchline of the slide.**
+
+<img src="distill_comparison (1).png" width="800"/>
+
+The chart (averaged over all schedulers and quant configs) tells the story clearly:
+
+| Compile mode | Vanilla total (50 steps) | Distilled total (8 steps) | Time saved | Per-step ratio (vanilla ÷ distilled) |
+|---|---|---|---|---|
+| Eager | ~90 s | ~11 s | **−79 s** | 1.29× |
+| JIT default | ~60 s | ~9 s | **−51 s** | 1.18× |
+| JIT reduce-OH | ~60 s | ~8 s | **−52 s** | 1.19× |
+| JIT max-AT | ~61 s | ~8 s | **−53 s** | 1.20× |
+| AOT default | ~81 s | ~10 s | **−71 s** | 1.32× |
+| AOT reduce-OH | ~87 s | ~10 s | **−77 s** | 1.39× |
+| AOT max-AT | ~88 s | ~11 s | **−77 s** | 1.36× |
+
+The per-step ratio is only **1.18–1.39×** across every compile mode — same architecture, same FLOPs per forward, so the individual step isn't radically faster (the small remaining gap is mostly the CFG effect: vanilla runs 2 DiT forwards per step, distilled runs 1). The entire end-to-end **6.7–8.7× speedup is multiplicative step reduction + dropping CFG, not per-step kernel speed**.
+
+That is the whole point of the slide: distillation is the "fewer steps" lever, and it's the single biggest one available because it removes work multiplicatively rather than shaving per-step cost.
+
+The tradeoff worth mentioning is pushing to very few steps can cost some fine detail and output diversity versus the 50-step teacher, which is why the solver/scheduler choice matters as a quality gate at low step counts.
 
 ---
 
@@ -374,12 +549,6 @@ for block in pipe.transformer.transformer_blocks:
 - HunyuanVideo e2e: 945s → 685s with Sliding-Tile-Attention (training-free).
 - Wan2.1 1.3B: 31s → 18s with Video Sparse Attention.
 - FA3 vs FA2 in DiTs: 1.5–2× forward pass speedup.
-
-### How SGLang Diffusion uses it
-
-- `sgl-kernel` ships pre-compiled attention kernels (same ones from the LLM stack).
-- Backend selection: `--attention-backend flash_attn_3` CLI flag.
-- Roadmap: FA4 integration for Blackwell in Q1 2026.
 
 ### Slide content (no live demo — too low-level)
 
@@ -478,86 +647,6 @@ Intel's stock surged roughly 240% year-to-date in 2026, driven largely by its fo
 In short, the landscape is diversifying fast. NVIDIA still holds the high ground for training, but 2026 is the year that custom silicon, wafer-scale architecture, and on-device AI all became genuine competitive forces — especially for the inference workloads that now dominate AI compute.
 
 ---
-
-## Block 5 — Custom Triton / CUDA Kernels on the Hot Path (6 min)
-
-### What's left after compile + FlashAttention?
-
-Look back at the profile — the residual hot path:
-
-1. **RoPE** (rotary embedding) — applied to Q and K every block, every step.
-2. **RMSNorm** — twice per block.
-3. **Quantization** (FP8/INT8/NVFP4) cast + scale.
-4. **AdaLN modulation** — the timestep-conditioning pattern: `x = (1 + scale) * norm(x) + shift`.
-
-All memory-bound, pointwise/reduce ops — perfect for fusion.
-
-### Reference speedups (Liger Kernel benchmarks)
-
-
-| Op                        | Speedup vs unfused | Memory reduction |
-| ------------------------- | ------------------ | ---------------- |
-| Fused RoPE (Triton)       | **8×**             | 3×               |
-| Fused RMSNorm             | **7×**             | 3×               |
-| Fused SwiGLU / GeGLU      | ~2×                | ~2×              |
-| Fused Linear+CrossEntropy | ~2×                | up to 5×         |
-
-
-### Mini Triton kernel demo — fused RMSNorm
-
-```python
-import triton
-import triton.language as tl
-import torch
-
-@triton.jit
-def rmsnorm_fwd(
-    x_ptr, w_ptr, y_ptr,
-    stride, n_cols,
-    eps: tl.constexpr,
-    BLOCK: tl.constexpr,
-):
-    row = tl.program_id(0)
-    cols = tl.arange(0, BLOCK)
-    mask = cols < n_cols
-
-    x = tl.load(x_ptr + row * stride + cols, mask=mask, other=0.0).to(tl.float32)
-    var = tl.sum(x * x, axis=0) / n_cols
-    rstd = 1.0 / tl.sqrt(var + eps)
-    w = tl.load(w_ptr + cols, mask=mask)
-    y = (x * rstd) * w
-    tl.store(y_ptr + row * stride + cols, y, mask=mask)
-
-def rmsnorm(x, w, eps=1e-6):
-    y = torch.empty_like(x)
-    n_rows, n_cols = x.shape
-    BLOCK = triton.next_power_of_2(n_cols)
-    rmsnorm_fwd[(n_rows,)](
-        x, w, y, x.stride(0), n_cols,
-        eps=eps, BLOCK=BLOCK, num_warps=4,
-    )
-    return y
-```
-
-Bench it live:
-
-```python
-x = torch.randn(74000, 1536, device="cuda", dtype=torch.bfloat16)
-w = torch.ones(1536, device="cuda", dtype=torch.bfloat16)
-%timeit torch.nn.functional.rms_norm(x, [1536], w)   # ~0.5 ms
-%timeit rmsnorm(x, w)                                # ~0.07 ms
-```
-
-colab notebook related to this:
-https://colab.research.google.com/drive/1LsrhwqFaCu-iVUm4BxWHOYqOkUey7BOM#scrollTo=ABMI6grU5iMU
-
-
-There are some points here. Why are we doing this?
-
-1. Because we can now. writing cuda code is hard, but there has been an explosion of DSLs which are trying to make the computations fast and will be productive from a coding POV. Before 2026 this was not possible.
-2. cudnn although quite good will still rely on some heuristics. Its always worth it to go through your production usage, and then create the kernel that is exactly inline with that. That will be the best.
-3. even if you fail, you would have proven that better than this is not possible and the exact reasons for that.
-4. in the proces you will learn a lot of things about the hardware that you are using. not caring about the hardware where you are running is pre 2025. Now you want to run the software that best gels with the hardware that you have. its like you may not be usain bolt, but there are latent capabilties that you have that will make you the most efficient and you need to discover the conditions to do that.
 
 ### How SGLang / FastVideo use custom kernels
 
@@ -856,3 +945,7 @@ sglang serve --model-path <MODEL> \
 # references
 
 * https://diffstudy.com/gpu-vs-tpu-vs-npu-ai-workloads/
+* https://m.dailyhunt.in/news/india/english/inc42-epaper-inc/indian+ai+startup+tracker+170+startups+putting+india+on+the+global+ai+map-newsid-n701717629
+* https://www.cloudraft.io/blog/top-5-sovereign-ai-cloud-in-india
+* https://techcrunch.com/2026/05/05/indias-first-genai-unicorn-shifts-to-cloud-services-as-ai-model-ambitions-face-reality/
+* https://medium.com/@pratik-rupareliya/top-20-indian-ai-companies-building-real-infrastructure-in-2026-a97473ffa287
